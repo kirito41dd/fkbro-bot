@@ -1,16 +1,14 @@
 use futures::StreamExt;
+use teloxide::Bot;
+use teloxide::requests::Requester;
+use teloxide::types::Message;
 use std::collections::HashMap;
 use std::{future::Future, io, pin::Pin, process::Output};
-use telegram_bot::{update, GetMe};
 use tracing::{error, info, trace};
-
-use telegram_bot::Api;
-use telegram_bot::Update;
 use tower::Service;
 
 pub struct BotRequest {
-    pub api: Api,
-    pub update: Update,
+   
 }
 pub struct BotHandle;
 
@@ -34,15 +32,15 @@ impl Service<BotRequest> for BotHandle {
 }
 
 pub struct BotWrapper<H> {
-    api: Api,
+    bot: teloxide::Bot,
     commands: HashMap<String, H>,
 }
 
 impl<H> BotWrapper<H> {
     pub fn new(token: String) -> Self {
-        let api = Api::new(token);
+        let bot = teloxide::Bot::new(token);
         BotWrapper {
-            api,
+            bot,
             commands: HashMap::new(),
         }
     }
@@ -51,20 +49,10 @@ impl<H> BotWrapper<H> {
     }
 
     pub async fn run(&self) {
-        info!("bot run");
-        let result = self.api.send(GetMe).await.unwrap();
-        info!("get me {:?}", result);
-        let mut stream = self.api.stream();
-        while let Some(update) = stream.next().await {
-            info!("new update");
-            match update {
-                Ok(update) => {
-                    trace!("update {:?}", update);
-                }
-                Err(err) => {
-                    error!("update err:{}", err);
-                }
-            }
-        }
+       teloxide::repl(self.bot.clone(), |bot: Bot, msg: Message| async move {
+        info!("msg {:#?}", msg);
+        bot.send_dice(msg.chat.id).await?;
+        Ok(())
+    }).await
     }
 }

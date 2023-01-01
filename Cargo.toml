@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 tower = { version = "0.4", features = ["full"] }
-telegram-bot =  { git = "https://github.com/telegram-rs/telegram-bot.git", rev = "65ad5cfd578e9a1260ce6daac714eb2153c0bec7" }
+teloxide = { version = "0.11", features = ["macros"] }
 clap = {version = "4", features = ["derive"]}
 futures = "0.3"
 tracing = "0.1"
