@@ -1,15 +1,14 @@
 use futures::StreamExt;
-use teloxide::Bot;
+use std::collections::HashMap;
+use std::{future::Future, io, pin::Pin};
+
 use teloxide::requests::Requester;
 use teloxide::types::Message;
-use std::collections::HashMap;
-use std::{future::Future, io, pin::Pin, process::Output};
-use tracing::{error, info, trace};
+use teloxide::Bot;
 use tower::Service;
+use tracing::info;
 
-pub struct BotRequest {
-   
-}
+pub struct BotRequest {}
 pub struct BotHandle;
 
 impl Service<BotRequest> for BotHandle {
@@ -26,7 +25,7 @@ impl Service<BotRequest> for BotHandle {
         std::task::Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: BotRequest) -> Self::Future {
+    fn call(&mut self, _req: BotRequest) -> Self::Future {
         todo!()
     }
 }
@@ -49,10 +48,11 @@ impl<H> BotWrapper<H> {
     }
 
     pub async fn run(&self) {
-       teloxide::repl(self.bot.clone(), |bot: Bot, msg: Message| async move {
-        info!("msg {:#?}", msg);
-        bot.send_dice(msg.chat.id).await?;
-        Ok(())
-    }).await
+        teloxide::repl(self.bot.clone(), |bot: Bot, msg: Message| async move {
+            info!("msg {:#?}", msg);
+            bot.send_dice(msg.chat.id).await?;
+            Ok(())
+        })
+        .await
     }
 }
