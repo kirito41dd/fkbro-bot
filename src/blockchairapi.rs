@@ -7,13 +7,13 @@ pub struct BlockChairApi {
 }
 
 impl BlockChairApi {
-    pub fn new() -> Box<Self> {
+    pub fn new() -> Self {
         let client = Client::new();
 
-        Box::new(BlockChairApi {
+        BlockChairApi {
             client,
             base_url: "https://api.blockchair.com".into(),
-        })
+        }
     }
 
     pub async fn bitcoin_status(&self) -> Result<serde_json::Value, reqwest::Error> {

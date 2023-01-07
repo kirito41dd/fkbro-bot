@@ -1,0 +1,5 @@
+24h矿工费
+`平均 : ` `{{ fee.data.average_transaction_fee_24h }} sat(${{ fee.data.average_transaction_fee_usd_24h | fmt2f }})`
+`中位 : ` `{{ fee.data.median_transaction_fee_24h }} sat(${{ fee.data.median_transaction_fee_usd_24h | fmt2f }})`
+`建议 : ` `{{ fee.data.suggested_transaction_fee_per_byte_sat }} sat/byte`
+{% include "footer.tera" %}
