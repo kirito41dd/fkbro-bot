@@ -4,6 +4,7 @@ use lru_time_cache::LruCache;
 use serde_json::{json, Value};
 use teloxide::payloads::{SendMessage, SendMessageSetters};
 use tokio::sync::Mutex;
+use tracing::log::trace;
 
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
@@ -89,13 +90,7 @@ async fn command_handler(
     cmd: Command,
     ctx: Arc<BotWrapper>,
 ) -> anyhow::Result<()> {
-    //teloxide::utils::command::BotCommands
-    info!(
-        "msg {:#?}, cmd {:?}, {:?}",
-        msg,
-        cmd,
-        Command::bot_commands()
-    );
+    trace!("command handler msg {:?}, cmd {:?}", msg.text(), cmd);
     match cmd {
         Command::Help => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
@@ -107,7 +102,7 @@ async fn command_handler(
 }
 
 async fn message_handler(msg: Message, _bot: Bot) -> anyhow::Result<()> {
-    info!("message {:#?}", msg);
+    trace!("message_handler msg {:?}", msg.text());
     Ok(())
 }
 
