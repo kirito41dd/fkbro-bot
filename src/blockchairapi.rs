@@ -27,15 +27,3 @@ impl BlockChairApi {
         Ok(data)
     }
 }
-
-#[cfg(test)]
-mod test {
-    use crate::blockchairapi::BlockChairApi;
-
-    #[tokio::test]
-    async fn test_bitcoin_status() {
-        let api = BlockChairApi::new();
-        let data = api.bitcoin_status().await.unwrap();
-        println!("{:#?}", data);
-    }
-}

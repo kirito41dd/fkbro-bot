@@ -31,17 +31,3 @@ impl BianceApi {
         Ok(data)
     }
 }
-
-pub mod types {}
-
-#[cfg(test)]
-mod test {
-    use super::BianceApi;
-
-    #[tokio::test]
-    async fn test() {
-        let api = BianceApi::new();
-        let data = api.tiker("BTCUSDT", "1d").await.unwrap();
-        println!("{:#?}", data);
-    }
-}
