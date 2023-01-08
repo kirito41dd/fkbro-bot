@@ -1,29 +1,26 @@
-use futures::{Future, StreamExt};
+use futures::Future;
 
-use lru_time_cache::LruCache;
-use serde_json::{json, Value};
+use serde_json::Value;
 use teloxide::payloads::{SendMessage, SendMessageSetters};
+
 use tokio::sync::Mutex;
 use tracing::log::trace;
+use tracing::{trace_span, Instrument};
+use ttl_cache::TtlCache;
 
-use std::borrow::{Borrow, BorrowMut};
-use std::collections::HashMap;
-use std::fmt::format;
-
-use std::pin::Pin;
-use std::process::Output;
 use std::sync::Arc;
+use std::time::Duration;
 
 use teloxide::dispatching::{HandlerExt, UpdateFilterExt};
 use teloxide::prelude::Dispatcher;
 
 use teloxide::requests::Requester;
-use teloxide::types::{Message, ParseMode, Poll, Update};
+use teloxide::types::{Message, ParseMode, Update};
 use teloxide::{utils::command::BotCommands, Bot};
 
-use tracing::info;
-
+use crate::bianceapi::{self};
 use crate::blockchairapi;
+use crate::render::{filter_atof, filter_emoji, filter_fmt2f, filter_qoutevolume};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(
@@ -31,9 +28,11 @@ use crate::blockchairapi;
     description = "These commands are supported:"
 )]
 enum Command {
+    #[command(description = "price of coin.")]
+    P(String),
     #[command(description = "show btc transcation fee.")]
     Fee,
-    #[command(description = "display this text.")]
+    #[command(description = "help information.")]
     Help,
 }
 
@@ -41,23 +40,29 @@ enum Command {
 pub struct BotWrapper {
     bot: teloxide::Bot,
     blockchairapi: Arc<blockchairapi::BlockChairApi>,
+    bianceapi: Arc<bianceapi::BianceApi>,
     tpl: Arc<tera::Tera>,
-    cache1min: Arc<Mutex<LruCache<String, Arc<Value>>>>,
+    cache: Arc<Mutex<TtlCache<String, Arc<Value>>>>,
 }
 
 impl BotWrapper {
     pub fn new(token: String) -> Arc<Self> {
         let bot = teloxide::Bot::new(token);
         let blockchairapi = blockchairapi::BlockChairApi::new().into();
+        let bianceapi = bianceapi::BianceApi::new().into();
         let mut t = tera::Tera::new("templates/**/*.tera").unwrap();
         t.register_filter("fmt2f", filter_fmt2f);
+        t.register_filter("atof", filter_atof);
+        t.register_filter("qoutevolume", filter_qoutevolume);
+        t.register_filter("emoji", filter_emoji);
 
-        let cache1min = LruCache::with_expiry_duration(std::time::Duration::from_secs(60));
+        let cache = ttl_cache::TtlCache::new(usize::MAX);
         BotWrapper {
             bot,
             blockchairapi,
+            bianceapi,
             tpl: t.into(),
-            cache1min: Arc::new(Mutex::new(cache1min)),
+            cache: Arc::new(Mutex::new(cache)),
         }
         .into()
     }
@@ -90,15 +95,21 @@ async fn command_handler(
     cmd: Command,
     ctx: Arc<BotWrapper>,
 ) -> anyhow::Result<()> {
-    trace!("command handler msg {:?}, cmd {:?}", msg.text(), cmd);
-    match cmd {
-        Command::Help => {
-            bot.send_message(msg.chat.id, Command::descriptions().to_string())
-                .await?;
-        }
-        Command::Fee => ctx.anser_fee(msg).await?,
+    let span = trace_span!("command", "{:?} {:?} {:?}", cmd, msg.chat.id, msg.id);
+    let fut = async {
+        let mut render_ctx = tera::Context::new();
+        render_ctx.insert("ad", "[骗局🤡都是骗局🔥](https://t.me/+WQk4D0iBkURk4iID)");
+        match cmd {
+            Command::Help => {
+                bot.send_message(msg.chat.id, Command::descriptions().to_string())
+                    .await?;
+            }
+            Command::P(query) => ctx.anser_p(msg, query, render_ctx).await?,
+            Command::Fee => ctx.anser_fee(msg, render_ctx).await?,
+        };
+        Ok(())
     };
-    Ok(())
+    fut.instrument(span).await
 }
 
 async fn message_handler(msg: Message, _bot: Bot) -> anyhow::Result<()> {
@@ -107,15 +118,37 @@ async fn message_handler(msg: Message, _bot: Bot) -> anyhow::Result<()> {
 }
 
 impl BotWrapper {
-    async fn anser_fee(&self, msg: Message) -> anyhow::Result<()> {
+    async fn anser_p(
+        &self,
+        msg: Message,
+        mut query: String,
+        mut render_ctx: tera::Context,
+    ) -> anyhow::Result<()> {
+        if query.is_empty() {
+            query = "BTCUSDT".into();
+        }
+        if query.len() < 5 {
+            query = format!("{}USDT", query)
+        }
+        query = query.to_uppercase();
         let data = self
-            .get_1min_cache("fee", || self.blockchairapi.bitcoin_status())
+            .get_from_cache(&format!("p:{}", query), Duration::from_secs(5), || {
+                self.bianceapi.tiker(&query, "1d")
+            })
             .await?;
-        let mut ctx = tera::Context::new();
-        ctx.insert("ad", "[骗局🤡都是骗局🔥](https://t.me/+WQk4D0iBkURk4iID)");
-        ctx.insert("fee", data.as_ref());
-
-        let str = self.tpl.render("fee.tera", &ctx)?;
+        render_ctx.insert("data", data.as_ref());
+        let str = self.tpl.render("p.tera", &render_ctx)?;
+        self.send_md_message(msg.chat.id, str).await?;
+        Ok(())
+    }
+    async fn anser_fee(&self, msg: Message, mut render_ctx: tera::Context) -> anyhow::Result<()> {
+        let data = self
+            .get_from_cache("fee", Duration::from_secs(60), || {
+                self.blockchairapi.bitcoin_status()
+            })
+            .await?;
+        render_ctx.insert("fee", data.as_ref());
+        let str = self.tpl.render("fee.tera", &render_ctx)?;
         self.send_md_message(msg.chat.id, str).await?;
         Ok(())
     }
@@ -135,12 +168,13 @@ impl BotWrapper {
             .disable_web_page_preview(true)
     }
 
-    async fn get_1min_cache<F: Future<Output = Result<serde_json::Value, reqwest::Error>>>(
+    async fn get_from_cache<F: Future<Output = Result<serde_json::Value, reqwest::Error>>>(
         &self,
         key: &str,
+        ttl: std::time::Duration,
         get_val: impl FnOnce() -> F,
     ) -> Result<Arc<serde_json::Value>, reqwest::Error> {
-        let mut gd = self.cache1min.lock().await;
+        let gd = self.cache.lock().await;
         let data = gd.get(key);
         if let Some(d) = data {
             return Ok(d.clone());
@@ -148,17 +182,8 @@ impl BotWrapper {
         drop(gd);
 
         let data = get_val().await?;
-        let mut gd = self.cache1min.lock().await;
-        gd.insert(key.into(), Arc::new(data));
+        let mut gd = self.cache.lock().await;
+        gd.insert(key.into(), Arc::new(data), ttl);
         Ok(gd.get(key).unwrap().clone())
     }
 }
-
-fn filter_fmt2f(val: &Value, args: &HashMap<String, Value>) -> tera::Result<Value> {
-    let resutl = format!(
-        "{:.2}",
-        val.as_f64()
-            .ok_or(tera::Error::msg(format!("not float: {}", val)))?
-    );
-    Ok(Value::String(resutl))
-} /*  */

@@ -7,6 +7,7 @@ use tracing_subscriber::{
 mod bianceapi;
 mod blockchairapi;
 mod bot;
+mod render;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
