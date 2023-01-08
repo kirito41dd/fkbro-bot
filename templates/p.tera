@@ -1,0 +1,8 @@
+`{{data.symbol}}`
+{% set p = data.priceChangePercent | atof -%}
+`24h  ` `{{p | fmt2f(display_positive=1)}}%` `  {{p | emoji(positive=["😊","🥰","🤣","🥳","🎉","🚀"],negative=["😕","😑","😔","😥","🤡"])}}`
+`当前: ``{{data.lastPrice | atof | fmt2f}}`
+`最高: ``{{data.highPrice | atof | fmt2f}}`
+`最低: ``{{data.lowPrice | atof | fmt2f}}`
+`成交: ``${{data.quoteVolume | atof | qoutevolume(e8="亿",e4="万")}}`
+{% include "footer.tera" %}

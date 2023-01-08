@@ -23,7 +23,7 @@ impl BlockChairApi {
             .send()
             .await?;
         trace!("reqest {} code {}", resp.url(), resp.status());
-        let data = resp.json::<serde_json::Value>().await?;
+        let data = resp.error_for_status()?.json::<serde_json::Value>().await?;
         Ok(data)
     }
 }
