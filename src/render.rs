@@ -3,18 +3,23 @@ use std::collections::HashMap;
 use serde_json::{json, Value};
 
 pub fn filter_fmt2f(val: &Value, args: &HashMap<String, Value>) -> tera::Result<Value> {
+    let v = val
+        .as_f64()
+        .ok_or(tera::Error::msg(format!("not float: {}", val)))?;
+    let auto = args.get("auto").is_some();
+
     let resutl = if args.get("display_positive").is_some() {
-        format!(
-            "{:+.2}",
-            val.as_f64()
-                .ok_or(tera::Error::msg(format!("not float: {}", val)))?
-        )
+        if auto && v.abs() < 10.0 {
+            format!("{:+}", v)
+        } else {
+            format!("{:+.2}", v)
+        }
     } else {
-        format!(
-            "{:.2}",
-            val.as_f64()
-                .ok_or(tera::Error::msg(format!("not float: {}", val)))?
-        )
+        if auto && v.abs() < 10.0 {
+            format!("{}", v)
+        } else {
+            format!("{:.2}", v)
+        }
     };
     Ok(Value::String(resutl))
 }
@@ -84,4 +89,12 @@ pub fn filter_emoji(val: &Value, args: &HashMap<String, Value>) -> tera::Result<
     idx = idx.min(vec.len() - 1);
 
     Ok(Value::String(vec[idx].into()))
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_fmt() {
+        assert_eq!(format!("{:+}", 1.12300), "+1.123")
+    }
 }
