@@ -26,4 +26,19 @@ impl BlockChairApi {
         let data = resp.error_for_status()?.json::<serde_json::Value>().await?;
         Ok(data)
     }
+
+    pub async fn bitcoin_addr_info(&self, addr: &str) -> Result<serde_json::Value, reqwest::Error> {
+        let resp = self
+            .client
+            .get(format!(
+                "{}/bitcoin/dashboards/address/{}?limit=1&transaction_details=true",
+                self.base_url, addr
+            ))
+            .send()
+            .await?;
+
+        trace!("reqest {} code {}", resp.url(), resp.status());
+        let data = resp.error_for_status()?.json::<serde_json::Value>().await?;
+        Ok(data)
+    }
 }

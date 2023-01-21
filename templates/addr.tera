@@ -1,0 +1,12 @@
+{% for key, value in data.data -%}
+`地址: ``{{key}}`
+`余额: ``{{value.address.balance | stob}}BTC`
+`总接收: ``{{value.address.received | stob}}BTC`
+`总支出: ``{{value.address.spent | stob}}BTC`
+`交易次数: ``{{value.address.transaction_count}}`
+{% for tx in value.transactions -%}
+`最后一次交易: `[详情](https://blockchair.com/zh/bitcoin/transaction/{{tx.hash}})
+`最后交易时间: `{{tx.time|escape_md}}
+{% endfor -%}
+{% endfor -%}
+{% include "footer.tera" %}
