@@ -5,7 +5,7 @@ use teloxide::payloads::{SendMessage, SendMessageSetters};
 
 use tokio::sync::Mutex;
 use tracing::log::trace;
-use tracing::{trace_span, Instrument};
+use tracing::{info, trace_span, Instrument};
 use ttl_cache::TtlCache;
 
 use std::sync::Arc;
@@ -20,7 +20,9 @@ use teloxide::{utils::command::BotCommands, Bot};
 
 use crate::bianceapi::{self};
 use crate::blockchairapi;
-use crate::render::{filter_atof, filter_emoji, filter_fmt2f, filter_qoutevolume};
+use crate::render::{
+    filter_atof, filter_emoji, filter_escape_md, filter_fmt2f, filter_qoutevolume, filter_stob,
+};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(
@@ -32,6 +34,8 @@ enum Command {
     P(String),
     #[command(description = "show btc transcation fee.")]
     Fee,
+    #[command(description = "address info.")]
+    Addr(String),
     #[command(description = "help information.")]
     Help,
 }
@@ -55,6 +59,8 @@ impl BotWrapper {
         t.register_filter("atof", filter_atof);
         t.register_filter("qoutevolume", filter_qoutevolume);
         t.register_filter("emoji", filter_emoji);
+        t.register_filter("stob", filter_stob);
+        t.register_filter("escape_md", filter_escape_md);
 
         let cache = ttl_cache::TtlCache::new(usize::MAX);
         BotWrapper {
@@ -106,6 +112,7 @@ async fn command_handler(
             }
             Command::P(query) => ctx.anser_p(msg, query, render_ctx).await?,
             Command::Fee => ctx.anser_fee(msg, render_ctx).await?,
+            Command::Addr(addr) => ctx.anser_addr(msg, &addr, render_ctx).await?,
         };
         Ok(())
     };
@@ -149,6 +156,23 @@ impl BotWrapper {
             .await?;
         render_ctx.insert("fee", data.as_ref());
         let str = self.tpl.render("fee.tera", &render_ctx)?;
+        self.send_md_message(msg.chat.id, str).await?;
+        Ok(())
+    }
+
+    async fn anser_addr(
+        &self,
+        msg: Message,
+        addr: &str,
+        mut render_ctx: tera::Context,
+    ) -> anyhow::Result<()> {
+        let data = self
+            .get_from_cache(&format!("addr:{}", addr), Duration::from_secs(100), || {
+                self.blockchairapi.bitcoin_addr_info(addr)
+            })
+            .await?;
+        render_ctx.insert("data", data.as_ref());
+        let str = self.tpl.render("addr.tera", &render_ctx)?;
         self.send_md_message(msg.chat.id, str).await?;
         Ok(())
     }

@@ -91,6 +91,22 @@ pub fn filter_emoji(val: &Value, args: &HashMap<String, Value>) -> tera::Result<
     Ok(Value::String(vec[idx].into()))
 }
 
+// satoshi to btc, in float out float.
+pub fn filter_stob(val: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
+    let v = val
+        .as_f64()
+        .ok_or(tera::Error::msg(format!("not float: {}", val)))?;
+    Ok(json!(v / 1e8))
+}
+
+// escape_md
+pub fn filter_escape_md(val: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
+    let v = val
+        .as_str()
+        .ok_or(tera::Error::msg(format!("not str: {}", val)))?;
+    Ok(json!(teloxide::utils::markdown::escape(v)))
+}
+
 #[cfg(test)]
 mod test {
     #[test]

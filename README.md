@@ -7,7 +7,7 @@ build your own bot:
 2. quick run with docker.
 ```bash
 # test run
-docker run always -it --rm kirito41dd/fkbro-bot -t <your-bot-token>
+docker run -it --rm kirito41dd/fkbro-bot -t <your-bot-token>
 # server run
 docker run --restart always kirito41dd/fkbro-bot -t <your-bot-token>
 ```
