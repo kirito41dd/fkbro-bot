@@ -103,8 +103,8 @@ async fn command_handler(
 ) -> anyhow::Result<()> {
     let span = trace_span!("command", "{:?} {:?} {:?}", cmd, msg.chat.id, msg.id);
     let fut = async {
-        let mut render_ctx = tera::Context::new();
-        render_ctx.insert("ad", "[骗局🤡都是骗局🔥](https://t.me/+WQk4D0iBkURk4iID)");
+        let render_ctx = tera::Context::new();
+        // render_ctx.insert("ad", "[骗局🤡都是骗局🔥](https://t.me/+WQk4D0iBkURk4iID)");
         match cmd {
             Command::Help => {
                 bot.send_message(msg.chat.id, Command::descriptions().to_string())
